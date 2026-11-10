@@ -427,6 +427,9 @@ func serve(ctx context.Context, c config, o runOpts) error {
 	var md metadata.Provider = hosted.TMDB()
 	showMD := showSources(vault, hosted)
 	var artistMD metadata.ArtistProvider = musicSource(s, version)
+	// Sources name themselves to their sites: Go's default User-Agent is
+	// widely blocked by site protection, HolyArrs's own is not.
+	sources.SetUserAgentVersion(version)
 	// Music lookups go through the metadata server only: an install never
 	// asks MusicBrainz itself. A MusicBrainz stand-in (tests) is asked
 	// directly; HOLYARRS_DIRECT_SOURCES=1 (developers only) keeps the real

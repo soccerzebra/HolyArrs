@@ -67,6 +67,10 @@ type Config struct {
 	AllowAddr func(net.IP) bool
 	// AllowLocal lets this Source reach the local network.
 	AllowLocal bool
+	// UserAgent is sent on every request. Empty means the default, set by
+	// SetUserAgentVersion, so Cloudflare-style protection does not mistake
+	// HolyArrs for the Go http client's bot-default User-Agent.
+	UserAgent string
 	// Format is torznab, newznab or rss. An rss Source is read as it is: its URL
 	// plus APIKey (the URL's query) is the whole feed.
 	Format string
@@ -94,6 +98,23 @@ type Client struct {
 	caps *Caps
 }
 
+// userAgent is what Source requests carry when a Config names nothing. A
+// Source's protection (Cloudflare and the like) blocks Go's default
+// User-Agent because bots use it, so HolyArrs names itself instead.
+var userAgent = "HolyArrs/dev"
+
+// SetUserAgentVersion names the running version on every Source and Release
+// file request, e.g. "HolyArrs/1.0.9". Call it once at startup.
+func SetUserAgentVersion(version string) {
+	if version == "" {
+		version = "dev"
+	}
+	userAgent = "HolyArrs/" + version
+}
+
+// UserAgent is the User-Agent Source requests carry.
+func UserAgent() string { return userAgent }
+
 // New makes a Client from cfg, filling in the defaults.
 func New(cfg Config) *Client {
 	if cfg.Timeout <= 0 {
@@ -107,6 +128,9 @@ func New(cfg Config) *Client {
 		if cfg.AllowLocal {
 			cfg.AllowAddr = outbound.NotMetadata
 		}
+	}
+	if cfg.UserAgent == "" {
+		cfg.UserAgent = userAgent
 	}
 	var h http.Client
 	if cfg.HTTP != nil {
@@ -241,6 +265,7 @@ func (c *Client) fetch(ctx context.Context, raw string) ([]byte, error) {
 		outcome = outbound.TerminalFailure
 		return nil, &Error{Kind: KindBroken, Msg: "bad Source address"}
 	}
+	req.Header.Set("User-Agent", c.cfg.UserAgent)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		outcome = outbound.HTTPOutcome(0, err, ctx)
